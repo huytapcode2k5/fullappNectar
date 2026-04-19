@@ -9,6 +9,9 @@ import HomeScreen from './screens/HomeScreen';
 import ProductDetailScreen from './screens/ProductDetailScreen';
 import ExploreScreen from './screens/ExploreScreen';
 import BeveragesScreen from './screens/BeveragesScreen';
+import FilterScreen from './screens/FilterScreen';
+import CartScreen from './screens/CartScreen';
+import FavouriteScreen from './screens/FavouriteScreen';
 export default function App() {
   const [screen, setScreen] = useState('splash');
 
@@ -49,9 +52,19 @@ export default function App() {
           }}
         />
       )}
-      {screen === 'beverages' && (
-        <BeveragesScreen onBack={() => setScreen('explore')} />
+      {screen === 'filter' && (
+        <FilterScreen
+          onApply={() => setScreen('explore')}
+          onClose={() => setScreen('explore')}
+        />
       )}
+      {screen === 'cart' && <CartScreen onNavigate={setScreen} />}
+      {screen === 'favourite' && <FavouriteScreen onNavigate={setScreen} />}
+      {screen === 'beverages' && (
+        <BeveragesScreen onBack={() => setScreen('explore')}
+          onNavigate={setScreen} />
+      )}
+
       {screen === 'otp' && (
         <VerificationScreen
           onBack={() => setScreen('number')}

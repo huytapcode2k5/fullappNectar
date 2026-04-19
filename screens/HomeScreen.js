@@ -106,12 +106,10 @@ function BottomTab({ active, setActive, onNavigate }) {
                 <TouchableOpacity key={t.label} style={s.tabItem} onPress={() => {
                     setActive(i);
 
-                    if (i === 0) {
-                        onNavigate('home');   // 👈 QUAY VỀ HOME
-                    }
+                    const screens = ['home', 'explore', 'cart', 'favourite', 'account'];
 
-                    if (i === 1) {
-                        onNavigate('explore');
+                    if (screens[i]) {
+                        onNavigate && onNavigate(screens[i]);
                     }
                 }}>
                     <Text style={s.tabIcon}>{t.icon}</Text>

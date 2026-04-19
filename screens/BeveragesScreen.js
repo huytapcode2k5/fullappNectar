@@ -38,7 +38,7 @@ function ProductCard({ item }) {
     );
 }
 
-export default function BeveragesScreen({ onBack }) {
+export default function BeveragesScreen({ onBack, onNavigate }) {
     return (
         <SafeAreaView style={s.safe}>
             <StatusBar barStyle="dark-content" />
@@ -50,7 +50,7 @@ export default function BeveragesScreen({ onBack }) {
                 </TouchableOpacity>
                 <Text style={s.headerTitle}>Beverages</Text>
                 <TouchableOpacity style={s.filterBtn}>
-                    <Text style={s.filterIcon}>⇅</Text>
+                    <Text style={s.filterIcon} onPress={() => onNavigate && onNavigate('filter')}>⇅</Text>
                 </TouchableOpacity>
             </View>
 

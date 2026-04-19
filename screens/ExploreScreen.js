@@ -1,209 +1,236 @@
-// screens/ExploreScreen.js
 import React, { useState } from 'react';
 import {
-    View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    TextInput, Image, SafeAreaView, StatusBar,
+    View, Text, StyleSheet, SafeAreaView,
+    TextInput, TouchableOpacity, FlatList,
+    Image, ScrollView
 } from 'react-native';
 
-const GREEN = '#5DAF6A';
+import { categories, products } from '../data/data';
 
-const categories = [
-    { id: '1', name: 'Fresh Fruits\n& Vegetable', color: '#E8F5E9', image: require('../assets/rau.png') },
-    { id: '2', name: 'Cooking Oil\n& Ghee', color: '#FFF8E1', image: require('../assets/oil.png') },
-    { id: '3', name: 'Meat & Fish', color: '#FCE4EC', image: require('../assets/thit.png') },
-    { id: '4', name: 'Bakery &\nSnacks', color: '#F3E5F5', image: require('../assets/banhmi.png') },
-    { id: '5', name: 'Dairy & Eggs', color: '#E3F2FD', image: require('../assets/milk.png') },
-    { id: '6', name: 'Beverages', color: '#FFF3E0', image: require('../assets/nuocngot.png') },
-];
+const GREEN = '#53B175';
 
-function CategoryCard({ item, onPress }) {
+export default function ExploreScreen({ onNavigate }) {
+    const [searchText, setSearchText] = useState('');
+
+    const isSearching = searchText.trim().length > 0;
+
+    const filtered = products.filter(item =>
+        item.name.toLowerCase().includes(searchText.toLowerCase())
+    );
+
     return (
-        <TouchableOpacity
-            style={[s.categoryCard, { backgroundColor: item.color }]}
-            onPress={() => onPress && onPress(item)}
-            activeOpacity={0.82}
-        >
-            <Image source={item.image} style={s.categoryImg} resizeMode="contain" />
-            <Text style={s.categoryName}>{item.name}</Text>
-        </TouchableOpacity>
+        <SafeAreaView style={s.container}>
+            {/* TITLE */}
+            <Text style={s.title}>Find Products</Text>
+
+            {/* SEARCH */}
+            <View style={s.searchBox}>
+                <Text style={s.searchIcon}>🔍</Text>
+                <TextInput
+                    placeholder="Search Store"
+                    value={searchText}
+                    onChangeText={setSearchText}
+                    style={s.input}
+                />
+            </View>
+
+            {/* CONTENT */}
+            {!isSearching ? (
+                <ScrollView showsVerticalScrollIndicator={false}>
+                    <View style={s.grid}>
+                        {categories.map(item => (
+                            <TouchableOpacity
+                                key={item.id}
+                                style={[s.card, { backgroundColor: item.color }]}
+                                activeOpacity={0.8}
+                                onPress={() => {
+                                    if (item.screen) {
+                                        onNavigate(item.screen); // 👉 chuyển màn
+                                    }
+                                }}
+                            >
+                                <Image source={item.image} style={s.catImg} />
+                                <Text style={s.catText}>{item.name}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </ScrollView>
+            ) : (
+                <FlatList
+                    key={isSearching ? 'search' : 'category'}
+                    data={isSearching ? filtered : categories}
+                    numColumns={2}
+                    keyExtractor={(item) => item.id}
+                    renderItem={({ item }) =>
+                        isSearching ? (
+                            // PRODUCT
+                            <View style={s.productCard}>
+                                <View style={s.productCard}>
+                                    <Image source={item.image} style={s.productImg} />
+
+                                    <Text style={s.productName}>{item.name}</Text>
+                                    <Text style={s.productCategory}>{item.category}</Text>
+
+                                    <Text style={s.productPrice}>${item.price}</Text>
+                                </View>
+                            </View>
+                        ) : (
+                            // CATEGORY
+                            <TouchableOpacity
+                                style={[s.card, { backgroundColor: item.color }]}
+                                onPress={() => item.screen && onNavigate(item.screen)}
+                            >
+                                <Image source={item.image} style={s.catImg} />
+                                <Text>{item.name}</Text>
+                            </TouchableOpacity>
+                        )
+                    }
+                />
+            )}
+
+            {/* BOTTOM TAB */}
+            <BottomTab onNavigate={onNavigate} />
+        </SafeAreaView>
     );
 }
 
-const tabs = [
-    { icon: '🏠', label: 'Shop' },
-    { icon: '🔍', label: 'Explore' },
-    { icon: '🛒', label: 'Cart' },
-    { icon: '❤️', label: 'Favourite' },
-    { icon: '👤', label: 'Account' },
-];
+function BottomTab({ onNavigate }) {
+    const screens = ['home', 'explore', 'cart', 'favourite', 'account'];
+    const icons = ['🏠', '🔍', '🛒', '❤️', '👤'];
 
-function BottomTab({ active, setActive, onNavigate }) {
     return (
-        <View style={s.bottomTab}>
-            {tabs.map((t, i) => (
-                <TouchableOpacity key={t.label} style={s.tabItem} onPress={() => {
-                    setActive(i);
-
-                    if (i === 0) {
-                        onNavigate && onNavigate('home'); // 👈 FIX CHÍNH Ở ĐÂY
-                    }
-
-                    if (i === 1) {
-                        onNavigate && onNavigate('explore');
-                    }
-                }}>
-                    <Text style={s.tabIcon}>{t.icon}</Text>
-                    <Text style={[s.tabLabel, active === i && s.tabLabelActive]}>{t.label}</Text>
-                    {active === i && <View style={s.tabDot} />}
+        <View style={s.tab}>
+            {icons.map((icon, i) => (
+                <TouchableOpacity
+                    key={i}
+                    onPress={() => onNavigate(screens[i])}
+                >
+                    <Text style={s.tabIcon}>{icon}</Text>
                 </TouchableOpacity>
             ))}
         </View>
     );
 }
 
-export default function ExploreScreen({ onSelectCategory, onNavigate }) {
-    const [activeTab, setActiveTab] = useState(1);
-    const [searchText, setSearchText] = useState('');
-
-    const filtered = searchText
-        ? categories.filter(c => c.name.toLowerCase().includes(searchText.toLowerCase()))
-        : categories;
-
-    return (
-        <SafeAreaView style={s.safe}>
-            <StatusBar barStyle="dark-content" />
-            <View style={s.root}>
-                <ScrollView
-                    style={s.scroll}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingBottom: 90 }}
-                >
-                    {/* Header */}
-                    <View style={s.header}>
-                        <Text style={s.headerTitle}>Find Products</Text>
-                    </View>
-
-                    {/* Search bar */}
-                    <View style={s.searchBar}>
-                        <Text style={s.searchIcon}>🔍</Text>
-                        <TextInput
-                            style={s.searchInput}
-                            placeholder="Search Store"
-                            placeholderTextColor="#aaa"
-                            value={searchText}
-                            onChangeText={setSearchText}
-                        />
-                    </View>
-
-                    {/* Category grid */}
-                    <View style={s.grid}>
-                        {filtered.map(item => (
-                            <CategoryCard
-                                key={item.id}
-                                item={item}
-                                onPress={() => onSelectCategory && onSelectCategory(item)}
-                            />
-                        ))}
-                    </View>
-                </ScrollView>
-
-                <BottomTab
-                    active={activeTab}
-                    setActive={setActiveTab}
-                    onNavigate={onNavigate}
-                />
-            </View>
-        </SafeAreaView>
-    );
-}
-
 const s = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: '#fff' },
-    root: { flex: 1 },
-    scroll: { flex: 1 },
-
-    header: {
-        paddingHorizontal: 20,
-        paddingTop: 16,
-        paddingBottom: 8,
-        alignItems: 'center',
+    container: {
+        flex: 1,
+        backgroundColor: '#fff',
     },
-    headerTitle: {
+
+    title: {
+        textAlign: 'center',
         fontSize: 20,
-        fontWeight: '800',
+        fontWeight: '700',
+        marginVertical: 12,
         color: '#181725',
     },
 
-    searchBar: {
+    // SEARCH
+    searchBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginHorizontal: 16,
-        marginBottom: 20,
         backgroundColor: '#F2F3F2',
-        borderRadius: 12,
-        paddingHorizontal: 14,
+        marginHorizontal: 16,
+        borderRadius: 14,
+        paddingHorizontal: 12,
         paddingVertical: 10,
+        marginBottom: 10,
     },
-    searchIcon: { fontSize: 16, marginRight: 8 },
-    searchInput: { flex: 1, fontSize: 14, color: '#222' },
 
+    searchIcon: {
+        fontSize: 16,
+    },
+
+    input: {
+        flex: 1,
+        marginLeft: 8,
+        fontSize: 14,
+    },
+
+    // GRID
     grid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        paddingHorizontal: 12,
-        gap: 12,
         justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        marginTop: 10,
     },
-    categoryCard: {
-        width: '47%',
-        height: 170,
+
+    // CATEGORY CARD
+    card: {
+        width: '48%',
+        height: 160,
         borderRadius: 18,
+        padding: 12,
+        marginBottom: 14,
         justifyContent: 'flex-end',
-        padding: 14,
-        overflow: 'hidden',
-        marginBottom: 4,
+        alignItems: 'center',
+
+        borderWidth: 1,
+        borderColor: '#E2E2E2',
+
+        shadowColor: '#000',
+        shadowOpacity: 0.04,
+        shadowRadius: 5,
+        elevation: 2,
     },
-    categoryImg: {
+
+    catImg: {
         width: 90,
         height: 90,
         position: 'absolute',
-        top: 14,
-        right: 10,
-    },
-    categoryName: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#181725',
-        lineHeight: 20,
+        top: 15,
     },
 
-    bottomTab: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        flexDirection: 'row',
-        backgroundColor: '#fff',
-        borderTopWidth: 1,
-        borderTopColor: '#F0F0F0',
-        paddingBottom: 16,
-        paddingTop: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 10,
-        elevation: 12,
+    catText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#181725',
+        textAlign: 'center',
     },
-    tabItem: { flex: 1, alignItems: 'center', position: 'relative' },
-    tabIcon: { fontSize: 20, marginBottom: 2 },
-    tabLabel: { fontSize: 11, color: '#aaa', fontWeight: '500' },
-    tabLabelActive: { color: GREEN, fontWeight: '700' },
-    tabDot: {
-        position: 'absolute',
-        bottom: -10,
-        width: 4,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: GREEN,
+
+    // PRODUCT CARD (SEARCH)
+    productCard: {
+        flex: 1,
+        backgroundColor: '#F8F8F8',
+        margin: 5,
+        padding: 10,
+        borderRadius: 12,
+    },
+
+    productImg: {
+        width: 80,
+        height: 80,
+        alignSelf: 'center',
+    },
+
+    productName: {
+        fontWeight: '700',
+        marginTop: 5,
+    },
+
+    productCategory: {
+        fontSize: 12,
+        color: '#888',
+    },
+
+    productPrice: {
+        marginTop: 5,
+        fontWeight: '700',
+    },
+
+    // TAB
+    tab: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        paddingVertical: 10,
+        borderTopWidth: 1,
+        borderColor: '#eee',
+        backgroundColor: '#fff',
+    },
+
+    tabIcon: {
+        fontSize: 18,
     },
 });
