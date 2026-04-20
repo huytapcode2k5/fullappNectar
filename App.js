@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   StyleSheet, Text, View, Image, TouchableOpacity,
-  TextInput, ScrollView, KeyboardAvoidingView, Platform
+  TextInput, ScrollView, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Alert,
 } from 'react-native';
+import { authStorage } from './services/storageService';
 
 import HomeScreen from './screens/HomeScreen';
 import ProductDetailScreen from './screens/ProductDetailScreen';
@@ -12,85 +14,161 @@ import BeveragesScreen from './screens/BeveragesScreen';
 import FilterScreen from './screens/FilterScreen';
 import CartScreen from './screens/CartScreen';
 import FavouriteScreen from './screens/FavouriteScreen';
+import AccountScreen from './screens/AccountScreen';
+import OrdersScreen from './screens/OrdersScreen';
+import { CartProvider } from './CartContext';
+
+// ─── App Root ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [screen, setScreen] = useState('splash');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
+  // ── Auto-login: kiểm tra storage khi app khởi động ──
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setScreen('onboarding');
-    }, 2000);
-    return () => clearTimeout(timer);
+    async function checkAutoLogin() {
+      // Hiển thị splash tối thiểu 1.5 giây
+      const [authData] = await Promise.all([
+        authStorage.load(),
+        new Promise((res) => setTimeout(res, 1500)),
+      ]);
+
+      const { user, token } = authData;
+
+      if (user && token) {
+        // Có dữ liệu hợp lệ → tự động vào Home
+        setCurrentUser(user);
+        setScreen('home');
+      } else {
+        // Chưa đăng nhập → vào Onboarding
+        setScreen('onboarding');
+      }
+      setIsCheckingAuth(false);
+    }
+
+    checkAutoLogin();
   }, []);
 
-  return (
-    <>
-      {screen === 'splash' && <SplashScreen />}
-      {screen === 'onboarding' && (
-        <OnboardingScreen onNext={() => setScreen('signin')} />
-      )}
-      {screen === 'signin' && (
-        <SignInScreen
-          onNext={() => setScreen('number')}
-          onBack={() => setScreen('onboarding')}
-        />
-      )}
-      {screen === 'number' && (
-        <NumberScreen
-          onNext={() => setScreen('otp')}
-          onBack={() => setScreen('signin')}
-        />
-      )}
-      {screen === 'home' && <HomeScreen setScreen={setScreen} />}
-      {screen === 'productDetail' && (
-        <ProductDetailScreen onBack={() => setScreen('home')} />
-      )}
-      {screen === 'explore' && (
-        <ExploreScreen
-          onNavigate={setScreen}   // 👈 THÊM DÒNG NÀY
-          onSelectCategory={(cat) => {
-            if (cat.name.includes('Beverages')) setScreen('beverages');
-          }}
-        />
-      )}
-      {screen === 'filter' && (
-        <FilterScreen
-          onApply={() => setScreen('explore')}
-          onClose={() => setScreen('explore')}
-        />
-      )}
-      {screen === 'cart' && <CartScreen onNavigate={setScreen} />}
-      {screen === 'favourite' && <FavouriteScreen onNavigate={setScreen} />}
-      {screen === 'beverages' && (
-        <BeveragesScreen onBack={() => setScreen('explore')}
-          onNavigate={setScreen} />
-      )}
+  // ── Handler đăng nhập thành công ──
+  const handleLoginSuccess = async (user, token) => {
+    await authStorage.save(user, token);
+    setCurrentUser(user);
+    setScreen('home');
+  };
 
-      {screen === 'otp' && (
-        <VerificationScreen
-          onBack={() => setScreen('number')}
-          onNext={() => setScreen('selectLocation')}
-        />
-      )}
-      {screen === 'selectLocation' && (
-        <SelectLocationScreen
-          onNext={() => setScreen('login')}
-          onBack={() => setScreen('otp')}
-        />
-      )}
-      {screen === 'login' && (
-        <LoginScreen
-          onNext={() => setScreen('home')}   // 👈 QUAN TRỌNG
-          onBack={() => setScreen('selectLocation')}
-          onSignUp={() => setScreen('signup')}
-        />
-      )}
-      {screen === 'signup' && (
-        <SignUpScreen
-          onBack={() => setScreen('login')}
-          onLogin={() => setScreen('login')}
-        />
-      )}
-    </>
+  // ── Handler logout ──
+  const handleLogout = async () => {
+    Alert.alert(
+      'Đăng xuất',
+      'Bạn có chắc muốn đăng xuất không?',
+      [
+        { text: 'Huỷ', style: 'cancel' },
+        {
+          text: 'Đăng xuất',
+          style: 'destructive',
+          onPress: async () => {
+            await authStorage.clear();
+            setCurrentUser(null);
+            setScreen('onboarding');
+          },
+        },
+      ]
+    );
+  };
+
+  // ── Splash (luôn hiển thị khi đang kiểm tra auth) ──
+  if (screen === 'splash' || isCheckingAuth) {
+    return <SplashScreen />;
+  }
+
+  return (
+    <CartProvider>
+      <>
+        {screen === 'onboarding' && (
+          <OnboardingScreen onNext={() => setScreen('signin')} />
+        )}
+        {screen === 'signin' && (
+          <SignInScreen
+            onNext={() => setScreen('number')}
+            onBack={() => setScreen('onboarding')}
+          />
+        )}
+        {screen === 'number' && (
+          <NumberScreen
+            onNext={() => setScreen('otp')}
+            onBack={() => setScreen('signin')}
+          />
+        )}
+        {screen === 'home' && (
+          <HomeScreen
+            setScreen={setScreen}
+            currentUser={currentUser}
+            onLogout={handleLogout}
+          />
+        )}
+        {screen === 'productDetail' && (
+          <ProductDetailScreen onBack={() => setScreen('home')} />
+        )}
+        {screen === 'explore' && (
+          <ExploreScreen
+            onNavigate={setScreen}
+            onSelectCategory={(cat) => {
+              if (cat.name.includes('Beverages')) setScreen('beverages');
+            }}
+          />
+        )}
+        {screen === 'filter' && (
+          <FilterScreen
+            onApply={() => setScreen('explore')}
+            onClose={() => setScreen('explore')}
+          />
+        )}
+        {screen === 'cart' && <CartScreen onNavigate={setScreen} />}
+        {screen === 'favourite' && <FavouriteScreen onNavigate={setScreen} />}
+        {screen === 'orders' && (
+          <OrdersScreen onNavigate={setScreen} onBack={() => setScreen('account')} />
+        )}
+        {screen === 'account' && (
+          <AccountScreen
+            onNavigate={setScreen}
+            currentUser={currentUser}
+            onLogout={handleLogout}
+          />
+        )}
+        {screen === 'beverages' && (
+          <BeveragesScreen
+            onBack={() => setScreen('explore')}
+            onNavigate={setScreen}
+          />
+        )}
+        {screen === 'otp' && (
+          <VerificationScreen
+            onBack={() => setScreen('number')}
+            onNext={() => setScreen('selectLocation')}
+          />
+        )}
+        {screen === 'selectLocation' && (
+          <SelectLocationScreen
+            onNext={() => setScreen('login')}
+            onBack={() => setScreen('otp')}
+          />
+        )}
+        {screen === 'login' && (
+          <LoginScreen
+            onNext={handleLoginSuccess}   // ← nhận (user, token)
+            onBack={() => setScreen('selectLocation')}
+            onSignUp={() => setScreen('signup')}
+          />
+        )}
+        {screen === 'signup' && (
+          <SignUpScreen
+            onBack={() => setScreen('login')}
+            onLogin={() => setScreen('login')}
+            onSignUpSuccess={handleLoginSuccess}  // ← tuỳ chọn: auto-login sau signup
+          />
+        )}
+      </>
+    </CartProvider>
   );
 }
 
@@ -102,6 +180,7 @@ function SplashScreen() {
     <View style={styles.splash}>
       <Text style={styles.logo}>🥕 nectar</Text>
       <Text style={{ color: '#fff' }}>online groceries</Text>
+      <ActivityIndicator color="#fff" style={{ marginTop: 24 }} />
       <StatusBar style="light" />
     </View>
   );
@@ -240,12 +319,10 @@ function SelectLocationScreen({ onNext, onBack }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.locationScroll} showsVerticalScrollIndicator={false}>
-        {/* Back button */}
         <TouchableOpacity style={styles.backBtn} onPress={onBack}>
           <Text style={styles.backIcon}>‹</Text>
         </TouchableOpacity>
 
-        {/* Map image */}
         <Image
           source={require('./assets/illustration.png')}
           style={styles.mapImage}
@@ -257,14 +334,12 @@ function SelectLocationScreen({ onNext, onBack }) {
           Switche on your location to stay in tune with{"\n"}what's happening in your area
         </Text>
 
-        {/* Zone dropdown */}
         <Text style={styles.fieldLabel}>Your Zone</Text>
         <TouchableOpacity style={styles.dropdown}>
           <Text style={styles.dropdownText}>{zone}</Text>
           <Text style={styles.dropdownArrow}>∨</Text>
         </TouchableOpacity>
 
-        {/* Area dropdown */}
         <Text style={styles.fieldLabel}>Your Area</Text>
         <TouchableOpacity style={styles.dropdown}>
           <Text style={[styles.dropdownText, !area && { color: '#aaa' }]}>
@@ -273,7 +348,6 @@ function SelectLocationScreen({ onNext, onBack }) {
           <Text style={styles.dropdownArrow}>∨</Text>
         </TouchableOpacity>
 
-        {/* Submit button */}
         <TouchableOpacity style={styles.submitBtn} onPress={onNext}>
           <Text style={styles.submitText}>Submit</Text>
         </TouchableOpacity>
@@ -283,12 +357,63 @@ function SelectLocationScreen({ onNext, onBack }) {
 }
 
 // =============================
-// Login Screen
+// Login Screen  ← CÓ XÁC THỰC THỰC TẾ
 // =============================
 function LoginScreen({ onBack, onSignUp, onNext }) {
-  const [email, setEmail] = useState('Nguyễn Văn Huy');
-  const [password, setPassword] = useState('········');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async () => {
+    setError('');
+
+    // ── Validation cơ bản ──
+    if (!email.trim()) {
+      setError('Vui lòng nhập email.');
+      return;
+    }
+    if (!password) {
+      setError('Vui lòng nhập mật khẩu.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // ──────────────────────────────────────────────────────────────────────
+      // TODO: Thay đoạn này bằng API call thực tế của bạn, ví dụ:
+      //
+      //   const res = await fetch('https://your-api.com/auth/login', {
+      //     method: 'POST',
+      //     headers: { 'Content-Type': 'application/json' },
+      //     body: JSON.stringify({ email, password }),
+      //   });
+      //   const data = await res.json();
+      //   if (!res.ok) throw new Error(data.message || 'Đăng nhập thất bại');
+      //   const user  = data.user;
+      //   const token = data.token;
+      //
+      // Hiện tại: mock đơn giản để demo
+      // ──────────────────────────────────────────────────────────────────────
+      await new Promise((res) => setTimeout(res, 1000)); // giả lập network
+
+      // Mock kiểm tra (xoá khi có API thật)
+      if (password.length < 4) {
+        throw new Error('Mật khẩu không đúng.');
+      }
+
+      const user = { id: '1', name: email.split('@')[0], email };
+      const token = 'mock_token_' + Date.now();
+
+      // Gọi callback của App: lưu storage + chuyển màn hình
+      await onNext(user, token);
+    } catch (err) {
+      setError(err.message || 'Đăng nhập thất bại. Thử lại.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -296,32 +421,40 @@ function LoginScreen({ onBack, onSignUp, onNext }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.authScroll} showsVerticalScrollIndicator={false}>
-        {/* Carrot logo */}
         <View style={styles.carrotTop}>
           <Text style={styles.carrotEmoji}>🥕</Text>
         </View>
 
-        <Text style={styles.authTitle}>Loging</Text>
-        <Text style={styles.authSub}>Enter your emails and password</Text>
+        <Text style={styles.authTitle}>Login</Text>
+        <Text style={styles.authSub}>Enter your email and password</Text>
 
-        {/* Email field */}
+        {/* Hiển thị lỗi */}
+        {!!error && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
         <Text style={styles.inputLabel}>Email</Text>
         <TextInput
           style={styles.authInput}
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(t) => { setEmail(t); setError(''); }}
           keyboardType="email-address"
           autoCapitalize="none"
+          placeholder="you@example.com"
+          placeholderTextColor="#bbb"
         />
 
-        {/* Password field */}
         <Text style={styles.inputLabel}>Password</Text>
         <View style={styles.passwordRow}>
           <TextInput
             style={[styles.authInput, { flex: 1, borderBottomWidth: 0 }]}
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(t) => { setPassword(t); setError(''); }}
             secureTextEntry={!showPass}
+            placeholder="••••••••"
+            placeholderTextColor="#bbb"
           />
           <TouchableOpacity onPress={() => setShowPass(!showPass)} style={styles.eyeBtn}>
             <Text style={styles.eyeIcon}>{showPass ? '👁' : '🙈'}</Text>
@@ -329,24 +462,25 @@ function LoginScreen({ onBack, onSignUp, onNext }) {
         </View>
         <View style={styles.passwordUnderline} />
 
-        {/* Forgot password */}
         <TouchableOpacity style={styles.forgotRow}>
           <Text style={styles.forgotText}>Forgot Password?</Text>
         </TouchableOpacity>
 
-        {/* Log In button */}
         <TouchableOpacity
-          style={styles.primaryBtn}
-          onPress={onNext}
+          style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
+          onPress={handleLogin}
+          disabled={loading}
         >
-          <Text style={styles.primaryBtnText}>Log In</Text>
+          {loading
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.primaryBtnText}>Log In</Text>
+          }
         </TouchableOpacity>
 
-        {/* Sign up link */}
         <View style={styles.switchRow}>
           <Text style={styles.switchText}>Don't have an account? </Text>
           <TouchableOpacity onPress={onSignUp}>
-            <Text style={styles.switchLink}>Signup</Text>
+            <Text style={styles.switchLink}>Sign Up</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -355,13 +489,56 @@ function LoginScreen({ onBack, onSignUp, onNext }) {
 }
 
 // =============================
-// Sign Up Screen
+// Sign Up Screen  ← CÓ XÁC THỰC THỰC TẾ
 // =============================
-function SignUpScreen({ onBack, onLogin }) {
-  const [username, setUsername] = useState('Nguyễn Văn Huy');
-  const [email, setEmail] = useState('imshuvo97@gmail.com');
-  const [password, setPassword] = useState('········');
+function SignUpScreen({ onBack, onLogin, onSignUpSuccess }) {
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSignUp = async () => {
+    setError('');
+
+    if (!username.trim()) { setError('Vui lòng nhập tên.'); return; }
+    if (!email.trim()) { setError('Vui lòng nhập email.'); return; }
+    if (password.length < 6) { setError('Mật khẩu ít nhất 6 ký tự.'); return; }
+
+    setLoading(true);
+    try {
+      // ──────────────────────────────────────────────────────────────────────
+      // TODO: Thay bằng API đăng ký thực tế:
+      //
+      //   const res = await fetch('https://your-api.com/auth/signup', {
+      //     method: 'POST',
+      //     headers: { 'Content-Type': 'application/json' },
+      //     body: JSON.stringify({ username, email, password }),
+      //   });
+      //   const data = await res.json();
+      //   if (!res.ok) throw new Error(data.message || 'Đăng ký thất bại');
+      //   const user  = data.user;
+      //   const token = data.token;
+      //
+      // ──────────────────────────────────────────────────────────────────────
+      await new Promise((res) => setTimeout(res, 1000));
+
+      const user = { id: Date.now().toString(), name: username, email };
+      const token = 'mock_token_' + Date.now();
+
+      // Auto-login sau khi đăng ký thành công
+      if (onSignUpSuccess) {
+        await onSignUpSuccess(user, token);
+      } else {
+        onLogin(); // fallback: chuyển sang màn login
+      }
+    } catch (err) {
+      setError(err.message || 'Đăng ký thất bại. Thử lại.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -369,7 +546,6 @@ function SignUpScreen({ onBack, onLogin }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.authScroll} showsVerticalScrollIndicator={false}>
-        {/* Carrot logo */}
         <View style={styles.carrotTop}>
           <Text style={styles.carrotEmoji}>🥕</Text>
         </View>
@@ -377,37 +553,46 @@ function SignUpScreen({ onBack, onLogin }) {
         <Text style={styles.authTitle}>Sign Up</Text>
         <Text style={styles.authSub}>Enter your credentials to continue</Text>
 
-        {/* Username field */}
+        {!!error && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
         <Text style={styles.inputLabel}>Username</Text>
         <TextInput
           style={styles.authInput}
           value={username}
-          onChangeText={setUsername}
+          onChangeText={(t) => { setUsername(t); setError(''); }}
           autoCapitalize="words"
+          placeholder="Tên của bạn"
+          placeholderTextColor="#bbb"
         />
 
-        {/* Email field with checkmark */}
         <Text style={styles.inputLabel}>Email</Text>
         <View style={styles.passwordRow}>
           <TextInput
             style={[styles.authInput, { flex: 1, borderBottomWidth: 0 }]}
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(t) => { setEmail(t); setError(''); }}
             keyboardType="email-address"
             autoCapitalize="none"
+            placeholder="you@example.com"
+            placeholderTextColor="#bbb"
           />
-          <Text style={styles.checkIcon}>✓</Text>
+          {email.includes('@') && <Text style={styles.checkIcon}>✓</Text>}
         </View>
         <View style={styles.passwordUnderline} />
 
-        {/* Password field */}
         <Text style={styles.inputLabel}>Password</Text>
         <View style={styles.passwordRow}>
           <TextInput
             style={[styles.authInput, { flex: 1, borderBottomWidth: 0 }]}
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(t) => { setPassword(t); setError(''); }}
             secureTextEntry={!showPass}
+            placeholder="Tối thiểu 6 ký tự"
+            placeholderTextColor="#bbb"
           />
           <TouchableOpacity onPress={() => setShowPass(!showPass)} style={styles.eyeBtn}>
             <Text style={styles.eyeIcon}>{showPass ? '👁' : '🙈'}</Text>
@@ -415,7 +600,6 @@ function SignUpScreen({ onBack, onLogin }) {
         </View>
         <View style={styles.passwordUnderline} />
 
-        {/* Terms */}
         <Text style={styles.termsText}>
           By continuing you agree to our{' '}
           <Text style={styles.termsLink}>Terms of Service</Text>
@@ -423,23 +607,27 @@ function SignUpScreen({ onBack, onLogin }) {
           <Text style={styles.termsLink}>Privacy Policy.</Text>
         </Text>
 
-        {/* Sign Up button */}
-        <TouchableOpacity style={styles.primaryBtn}>
-          <Text style={styles.primaryBtnText}>Sing Up</Text>
+        <TouchableOpacity
+          style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
+          onPress={handleSignUp}
+          disabled={loading}
+        >
+          {loading
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.primaryBtnText}>Sign Up</Text>
+          }
         </TouchableOpacity>
 
-        {/* Login link */}
         <View style={styles.switchRow}>
           <Text style={styles.switchText}>Already have an account? </Text>
           <TouchableOpacity onPress={onLogin}>
-            <Text style={styles.switchLink}>Signup</Text>
+            <Text style={styles.switchLink}>Login</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
-
 
 // =============================
 // STYLES
@@ -489,7 +677,7 @@ const styles = StyleSheet.create({
   btnText: { color: '#fff', fontWeight: 'bold' },
 
   // --- Common ---
-  back: { left: 10 },
+  back: { fontSize: 24, left: 10 },
   container: { flex: 1, padding: 24, paddingTop: 64 },
   bigText: { fontSize: 22, fontWeight: 'bold', marginBottom: 20 },
   input: { borderBottomWidth: 1, padding: 10, marginBottom: 20 },
@@ -505,16 +693,6 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
-  },
-  circleBtn: {
-    backgroundColor: GREEN,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'flex-end',
-    marginTop: 30,
   },
   arrowBtn: {
     alignSelf: 'flex-end',
@@ -566,189 +744,73 @@ const styles = StyleSheet.create({
   phoneInput: { flex: 1 },
 
   // --- Select Location ---
-  locationContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  locationScroll: {
-    padding: 24,
-    paddingTop: 56,
-    alignItems: 'center',
-  },
-  backBtn: {
-    alignSelf: 'flex-start',
-    marginBottom: 16,
-    padding: 4,
-  },
-  back: {
-    fontSize: 30,
-  },
-  backIcon: {
-    fontSize: 28,
-    color: '#222',
-    fontWeight: '300',
-  },
-  mapIllustration: {
-    width: 160,
-    height: 160,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
-  mapBg: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: '#f0f0f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mapEmoji: { fontSize: 72 },
-  pinCircle: {
-    position: 'absolute',
-    top: 0,
-    right: 10,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  pinEmoji: { fontSize: 28 },
+  locationContainer: { flex: 1, backgroundColor: '#fff' },
+  locationScroll: { padding: 24, paddingTop: 56, alignItems: 'center' },
+  backBtn: { alignSelf: 'flex-start', marginBottom: 16, padding: 4 },
+  backIcon: { fontSize: 28, color: '#222', fontWeight: '300' },
   locationTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#222',
-    marginBottom: 8,
-    textAlign: 'center',
+    fontSize: 22, fontWeight: '700', color: '#222',
+    marginBottom: 8, textAlign: 'center',
   },
   locationSub: {
-    fontSize: 13,
-    color: '#888',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 32,
+    fontSize: 13, color: '#888', textAlign: 'center',
+    lineHeight: 20, marginBottom: 32,
   },
   fieldLabel: {
-    alignSelf: 'flex-start',
-    fontSize: 13,
-    color: '#555',
-    marginBottom: 6,
-    marginTop: 8,
+    alignSelf: 'flex-start', fontSize: 13, color: '#555',
+    marginBottom: 6, marginTop: 8,
   },
   dropdown: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    paddingVertical: 12,
-    marginBottom: 8,
+    width: '100%', flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0', paddingVertical: 12, marginBottom: 8,
   },
   dropdownText: { fontSize: 15, color: '#222' },
   dropdownArrow: { fontSize: 14, color: '#888' },
   submitBtn: {
-    marginTop: 32,
-    backgroundColor: GREEN,
-    borderRadius: 14,
-    width: '100%',
-    paddingVertical: 16,
-    alignItems: 'center',
+    marginTop: 32, backgroundColor: GREEN, borderRadius: 14,
+    width: '100%', paddingVertical: 16, alignItems: 'center',
   },
   submitText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 
   // --- Auth (Login / Sign Up) ---
-  authContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  authScroll: {
-    padding: 24,
-    paddingTop: 48,
-  },
-  carrotTop: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
+  authContainer: { flex: 1, backgroundColor: '#fff' },
+  authScroll: { padding: 24, paddingTop: 48 },
+  carrotTop: { alignItems: 'center', marginBottom: 24 },
   carrotEmoji: { fontSize: 42 },
-  authTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#222',
-    marginBottom: 6,
-  },
-  authSub: {
-    fontSize: 13,
-    color: '#888',
-    marginBottom: 28,
-  },
-  inputLabel: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 12,
-    marginBottom: 4,
-  },
+  authTitle: { fontSize: 24, fontWeight: '700', color: '#222', marginBottom: 6 },
+  authSub: { fontSize: 13, color: '#888', marginBottom: 28 },
+  inputLabel: { fontSize: 12, color: '#888', marginTop: 12, marginBottom: 4 },
   authInput: {
-    fontSize: 15,
-    color: '#222',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    marginBottom: 4,
+    fontSize: 15, color: '#222', paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: '#e0e0e0', marginBottom: 4,
   },
-  passwordRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  passwordUnderline: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    marginBottom: 4,
-  },
+  passwordRow: { flexDirection: 'row', alignItems: 'center' },
+  passwordUnderline: { borderBottomWidth: 1, borderBottomColor: '#e0e0e0', marginBottom: 4 },
   eyeBtn: { padding: 6 },
   eyeIcon: { fontSize: 16 },
-  checkIcon: {
-    fontSize: 18,
-    color: GREEN,
-    paddingHorizontal: 6,
-  },
-  forgotRow: {
-    alignItems: 'flex-end',
-    marginTop: 8,
-    marginBottom: 28,
-  },
-  forgotText: {
-    fontSize: 13,
-    color: '#555',
-  },
+  checkIcon: { fontSize: 18, color: GREEN, paddingHorizontal: 6 },
+  forgotRow: { alignItems: 'flex-end', marginTop: 8, marginBottom: 28 },
+  forgotText: { fontSize: 13, color: '#555' },
   primaryBtn: {
-    backgroundColor: GREEN,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 20,
+    backgroundColor: GREEN, borderRadius: 14,
+    paddingVertical: 16, alignItems: 'center', marginBottom: 20,
   },
-  primaryBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 4,
-  },
+  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  switchRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 4 },
   switchText: { fontSize: 13, color: '#555' },
   switchLink: { fontSize: 13, color: GREEN, fontWeight: '600' },
-  termsText: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 12,
-    marginBottom: 24,
-    lineHeight: 18,
-  },
+  termsText: { fontSize: 12, color: '#888', marginTop: 12, marginBottom: 24, lineHeight: 18 },
   termsLink: { color: GREEN },
+
+  // --- Error box ---
+  errorBox: {
+    backgroundColor: '#FFF0F0',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#E53935',
+  },
+  errorText: { color: '#C62828', fontSize: 13 },
 });

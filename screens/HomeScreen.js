@@ -3,52 +3,49 @@ import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     TextInput, Image, FlatList, SafeAreaView, StatusBar,
 } from 'react-native';
+import { useCart } from '../CartContext';
 
 const GREEN = '#5DAF6A';
 const LIGHT_GREEN = '#EAF6EC';
 
 // ── Dummy data ──────────────────────────────────────────
 const exclusiveOffers = [
-    { id: '1', name: 'Organic Bananas', desc: '7pcs, Pricag', price: '$4.99', image: require('../assets/banana.png') },
-    { id: '2', name: 'Red Apple', desc: '1kg, Pricag', price: '$4.99', image: require('../assets/apple.png') },
-
+    { id: 'eo1', name: 'Organic Bananas', desc: '7pcs, Pricag', price: 4.99, image: require('../assets/banana.png') },
+    { id: 'eo2', name: 'Red Apple', desc: '1kg, Pricag', price: 4.99, image: require('../assets/apple.png') },
 ];
 
 const bestSelling = [
-    { id: '1', name: 'Ớt', desc: '1kg, Pricag', price: '$4.99', image: require('../assets/ot.png') },
-    { id: '2', name: 'Gừng', desc: '1kg, Pricag', price: '$4.99', image: require('../assets/gung.png') },
+    { id: 'bs1', name: 'Ớt', desc: '1kg, Pricag', price: 4.99, image: require('../assets/ot.png') },
+    { id: 'bs2', name: 'Gừng', desc: '1kg, Pricag', price: 4.99, image: require('../assets/gung.png') },
 ];
 
 const groceries = [
-    { id: '1', name: 'Pulses', color: '#FFF3E0', image: require('../assets/pulses.png') },
-    { id: '2', name: 'Rice', color: '#F3E5F5', image: require('../assets/rice.png') },
-
+    { id: 'gr1', name: 'Pulses', color: '#FFF3E0', image: require('../assets/pulses.png') },
+    { id: 'gr2', name: 'Rice', color: '#F3E5F5', image: require('../assets/rice.png') },
 ];
 
 const meatItems = [
-    { id: '1', name: 'Beef Bone', desc: '1kg, Pricag', price: '$4.99', image: require('../assets/beef.png') },
-    { id: '2', name: 'Broiler Chicken', desc: '1kg, Pricag', price: '$4.99', image: require('../assets/chicken.png') },
-
+    { id: 'mt1', name: 'Beef Bone', desc: '1kg, Pricag', price: 4.99, image: require('../assets/beef.png') },
+    { id: 'mt2', name: 'Broiler Chicken', desc: '1kg, Pricag', price: 4.99, image: require('../assets/chicken.png') },
 ];
-
 
 // ── Sub-components ──────────────────────────────────────
 
 function SectionHeader({ title, onSeeAll }) {
     return (
         <View style={s.sectionHeader}>
-
             <Text style={s.sectionTitle}>{title}</Text>
             <TouchableOpacity onPress={onSeeAll}>
                 <Text style={s.seeAll}>See all</Text>
             </TouchableOpacity>
         </View>
-
     );
 }
 
 function ProductCard({ item, onPress }) {
-    const [added, setAdded] = useState(false);
+    const { addToCart, cart } = useCart();
+    const inCart = cart.some(c => c.id === item.id);
+
     return (
         <TouchableOpacity style={s.productCard} onPress={() => onPress && onPress(item)}>
             <View style={s.productImgBox}>
@@ -57,12 +54,12 @@ function ProductCard({ item, onPress }) {
             <Text style={s.productName}>{item.name}</Text>
             <Text style={s.productDesc}>{item.desc}</Text>
             <View style={s.productFooter}>
-                <Text style={s.productPrice}>{item.price}</Text>
+                <Text style={s.productPrice}>${item.price.toFixed(2)}</Text>
                 <TouchableOpacity
-                    style={[s.addBtn, added && s.addBtnActive]}
-                    onPress={() => setAdded(!added)}
+                    style={[s.addBtn, inCart && s.addBtnActive]}
+                    onPress={() => addToCart(item)}
                 >
-                    <Text style={s.addBtnText}>{added ? '✓' : '+'}</Text>
+                    <Text style={s.addBtnText}>{inCart ? '✓' : '+'}</Text>
                 </TouchableOpacity>
             </View>
         </TouchableOpacity>
@@ -78,18 +75,6 @@ function GroceryChip({ item }) {
     );
 }
 
-function Banner({ item }) {
-    return (
-        <View style={[s.banner, { backgroundColor: item.bg }]}>
-            <View style={s.bannerText}>
-                <Text style={s.bannerTitle}>{item.title}</Text>
-                <Text style={s.bannerSub}>{item.sub}</Text>
-            </View>
-            <Image source={item.image} style={s.bannerImg} resizeMode="contain" />
-        </View>
-    );
-}
-
 // ── Bottom Tab ──────────────────────────────────────────
 const tabs = [
     { icon: '🏠', label: 'Shop' },
@@ -100,19 +85,24 @@ const tabs = [
 ];
 
 function BottomTab({ active, setActive, onNavigate }) {
+    const { cartCount } = useCart();
+    const screens = ['home', 'explore', 'cart', 'favourite', 'account'];
     return (
         <View style={s.bottomTab}>
             {tabs.map((t, i) => (
                 <TouchableOpacity key={t.label} style={s.tabItem} onPress={() => {
                     setActive(i);
-
-                    const screens = ['home', 'explore', 'cart', 'favourite', 'account'];
-
-                    if (screens[i]) {
-                        onNavigate && onNavigate(screens[i]);
-                    }
+                    if (screens[i]) onNavigate && onNavigate(screens[i]);
                 }}>
-                    <Text style={s.tabIcon}>{t.icon}</Text>
+                    <View>
+                        <Text style={s.tabIcon}>{t.icon}</Text>
+                        {/* Badge số lượng giỏ */}
+                        {i === 2 && cartCount > 0 && (
+                            <View style={s.badge}>
+                                <Text style={s.badgeText}>{cartCount > 9 ? '9+' : cartCount}</Text>
+                            </View>
+                        )}
+                    </View>
                     <Text style={[s.tabLabel, active === i && s.tabLabelActive]}>{t.label}</Text>
                     {active === i && <View style={s.tabDot} />}
                 </TouchableOpacity>
@@ -125,6 +115,7 @@ function BottomTab({ active, setActive, onNavigate }) {
 export default function HomeScreen({ setScreen }) {
     const [activeTab, setActiveTab] = useState(0);
     const [searchText, setSearchText] = useState('');
+    const { cartCount } = useCart();
 
     return (
         <SafeAreaView style={s.safe}>
@@ -139,15 +130,20 @@ export default function HomeScreen({ setScreen }) {
                     <View style={s.locationBar}>
                         <View style={s.centerBox}>
                             <Text style={s.carrotEmoji}>🥕</Text>
-
                             <View style={s.locationRow}>
                                 <Text style={s.locationPin}>📍</Text>
                                 <Text style={s.locationText}>Dhaka, Banassre</Text>
                             </View>
                         </View>
 
-                        <TouchableOpacity style={s.cartIcon}>
+                        {/* Cart icon với badge */}
+                        <TouchableOpacity style={s.cartIcon} onPress={() => setScreen('cart')}>
                             <Text style={{ fontSize: 20 }}>🛒</Text>
+                            {cartCount > 0 && (
+                                <View style={s.badge}>
+                                    <Text style={s.badgeText}>{cartCount > 9 ? '9+' : cartCount}</Text>
+                                </View>
+                            )}
                         </TouchableOpacity>
                     </View>
 
@@ -163,17 +159,6 @@ export default function HomeScreen({ setScreen }) {
                         />
                     </View>
 
-                    {/* Banner carousel */}
-                    <FlatList
-                        //data={banners}
-                        keyExtractor={b => b.id}
-                        horizontal
-                        pagingEnabled
-                        showsHorizontalScrollIndicator={false}
-                        style={s.bannerList}
-                        renderItem={({ item }) => <Banner item={item} />}
-                    />
-
                     {/* Exclusive Offer */}
                     <SectionHeader title="Exclusive Offer" onSeeAll={() => { }} />
                     <FlatList
@@ -186,9 +171,7 @@ export default function HomeScreen({ setScreen }) {
                             <ProductCard
                                 item={item}
                                 onPress={() => {
-                                    if (item.name.includes('Apple')) {
-                                        setScreen('productDetail');
-                                    }
+                                    if (item.name.includes('Apple')) setScreen('productDetail');
                                 }}
                             />
                         )}
@@ -245,98 +228,42 @@ const s = StyleSheet.create({
     scroll: { flex: 1 },
 
     locationBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        flexDirection: 'row', alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        marginTop: 10,
+        paddingHorizontal: 20, marginTop: 10,
     },
-
-    centerBox: {
-        flex: 1,
-        alignItems: 'center',
-    },
-
-    carrotEmoji: {
-        fontSize: 28,
-        marginBottom: 5,
-    },
-
-    locationRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-
-    locationPin: {
-        marginRight: 5,
-    },
-
-    locationText: {
-        fontSize: 14,
-        fontWeight: '600',
-    },
-
-    cartIcon: {
-        position: 'absolute',
-        right: 20,
-        top: 10,
-    },
+    centerBox: { flex: 1, alignItems: 'center' },
+    carrotEmoji: { fontSize: 28, marginBottom: 5 },
+    locationRow: { flexDirection: 'row', alignItems: 'center' },
+    locationPin: { marginRight: 5 },
+    locationText: { fontSize: 14, fontWeight: '600' },
+    cartIcon: { position: 'absolute', right: 20, top: 10 },
 
     searchBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginHorizontal: 16,
-        marginBottom: 16,
-        backgroundColor: '#F2F3F2',
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
+        flexDirection: 'row', alignItems: 'center',
+        marginHorizontal: 16, marginBottom: 16,
+        backgroundColor: '#F2F3F2', borderRadius: 12,
+        paddingHorizontal: 14, paddingVertical: 10,
     },
     searchIcon: { fontSize: 16, marginRight: 8 },
     searchInput: { flex: 1, fontSize: 14, color: '#222' },
 
-    bannerList: { paddingHorizontal: 16, marginBottom: 20 },
-    banner: {
-        width: 320,
-        borderRadius: 16,
-        padding: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    bannerText: { flex: 1 },
-    bannerTitle: { fontSize: 18, fontWeight: '800', color: '#222', marginBottom: 4 },
-    bannerSub: { fontSize: 13, color: '#555' },
-    bannerImg: { width: 100, height: 100 },
-
     sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        marginBottom: 12,
-        marginTop: 4,
+        flexDirection: 'row', justifyContent: 'space-between',
+        alignItems: 'center', paddingHorizontal: 16,
+        marginBottom: 12, marginTop: 4,
     },
     sectionTitle: { fontSize: 18, fontWeight: '800', color: '#181725' },
     seeAll: { fontSize: 14, color: GREEN, fontWeight: '600' },
 
     productCard: {
-        width: 152,
-        backgroundColor: '#fff',
-        borderRadius: 18,
-        borderWidth: 1,
-        borderColor: '#EBEBEB',
-        padding: 14,
-        marginRight: 12,
-        marginBottom: 4,
+        width: 152, backgroundColor: '#fff', borderRadius: 18,
+        borderWidth: 1, borderColor: '#EBEBEB',
+        padding: 14, marginRight: 12, marginBottom: 4,
     },
     productImgBox: {
-        backgroundColor: '#F8F8F8',
-        borderRadius: 12,
-        height: 96,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 10,
+        backgroundColor: '#F8F8F8', borderRadius: 12,
+        height: 96, justifyContent: 'center', alignItems: 'center', marginBottom: 10,
     },
     productImg: { width: 72, height: 72 },
     productName: { fontSize: 14, fontWeight: '700', color: '#181725', marginBottom: 2 },
@@ -344,59 +271,43 @@ const s = StyleSheet.create({
     productFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     productPrice: { fontSize: 16, fontWeight: '800', color: '#181725' },
     addBtn: {
-        backgroundColor: GREEN,
-        width: 34,
-        height: 34,
-        borderRadius: 10,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: GREEN,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.35,
-        shadowRadius: 8,
-        elevation: 5,
+        backgroundColor: GREEN, width: 34, height: 34, borderRadius: 10,
+        justifyContent: 'center', alignItems: 'center',
+        shadowColor: GREEN, shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35, shadowRadius: 8, elevation: 5,
     },
     addBtnActive: { backgroundColor: '#222' },
     addBtnText: { color: '#fff', fontSize: 20, lineHeight: 24, fontWeight: '600' },
 
     groceryChip: {
-        width: 180,
-        height: 100,
-        borderRadius: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
+        width: 180, height: 100, borderRadius: 16,
+        flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
     },
     groceryImg: { width: 56, height: 56, marginRight: 10 },
     groceryName: { fontSize: 15, fontWeight: '700', color: '#333' },
 
     bottomTab: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        flexDirection: 'row',
-        backgroundColor: '#fff',
-        borderTopWidth: 1,
-        borderTopColor: '#F0F0F0',
-        paddingBottom: 16,
-        paddingTop: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 10,
-        elevation: 12,
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        flexDirection: 'row', backgroundColor: '#fff',
+        borderTopWidth: 1, borderTopColor: '#F0F0F0',
+        paddingBottom: 16, paddingTop: 10,
+        shadowColor: '#000', shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.06, shadowRadius: 10, elevation: 12,
     },
     tabItem: { flex: 1, alignItems: 'center', position: 'relative' },
     tabIcon: { fontSize: 20, marginBottom: 2 },
     tabLabel: { fontSize: 11, color: '#aaa', fontWeight: '500' },
     tabLabelActive: { color: GREEN, fontWeight: '700' },
     tabDot: {
-        position: 'absolute',
-        bottom: -10,
-        width: 4,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: GREEN,
+        position: 'absolute', bottom: -10,
+        width: 4, height: 4, borderRadius: 2, backgroundColor: GREEN,
     },
+
+    // Badge
+    badge: {
+        position: 'absolute', top: -4, right: -8,
+        backgroundColor: '#E53935', borderRadius: 8,
+        minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center',
+    },
+    badgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
 });
